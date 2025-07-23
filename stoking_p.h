@@ -22,7 +22,6 @@ private:
 
     void setup_search_autocomplete();
     bool eventFilter(QObject* obj, QEvent* event);
-    bool eventEnterFilter(QObject* obj, QEvent* event);
     void update_transaction_summary();
     void clear_cart();
     void setup_cartTb();

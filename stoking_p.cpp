@@ -14,6 +14,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QInputDialog>
 
 void start_db();
 void close_db();
@@ -43,17 +44,18 @@ stoking_p::stoking_p(QWidget *parent)
     setup_connects();
 
 
-    //=================
-
-
-
-    //===================
-
-
 }
 //=====================================================================================================================
 
 void stoking_p::setup_cartTb(){
+
+    QStandardItemModel* model = qobject_cast<QStandardItemModel*>(ui->cartListTB->model());
+    if (!model) {
+        model = new QStandardItemModel(this);
+        ui->cartListTB->setModel(model);
+        model->setHorizontalHeaderLabels({"Name", "Type", "Quantity", "Price", "Subtotal"});
+    }
+
     ui->cartListTB->installEventFilter(this);
     ui->cartListTB->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->cartListTB->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -70,8 +72,40 @@ void stoking_p::showContextMenuCartList(const QPoint &pos){
 
     QAction *selectedAction = contextMenu.exec(ui->cartListTB->viewport()->mapToGlobal(pos));
 
+    QAbstractItemModel *model = ui->cartListTB->model();
+
     if (!selectedAction) return;
+
+    if (selectedAction == deleteAction) {
+        auto response = QMessageBox::question(this, "Delete Confirmation", "Are you sure you want to delete this item?");
+        if (response == QMessageBox::Yes) {
+            model->removeRow(index.row());
+        }
+    } else if (selectedAction == editAction) {
+        int quantityColumn = 2;
+        bool ok;
+        int currentQty = model->data(model->index(index.row(), quantityColumn)).toInt();
+
+        int newQty = QInputDialog::getInt(this,
+                                          "Set Quantity",
+                                          "Enter quantity (1 - 1000):",
+                                          currentQty,
+                                          1,
+                                          1000,
+                                          1,
+                                          &ok);
+
+        if (ok) {
+            model->setData(model->index(index.row(), quantityColumn), newQty);
+            float price = model->data(model->index(index.row(), 3)).toFloat();
+            double total = newQty * price;
+            QString totalStr = QString::number(total, 'f', 2);
+            model->setData(model->index(index.row(), 4), totalStr);
+        }
+    }
+    update_transaction_summary();
 }
+
 
 void stoking_p::setup_search_autocomplete() {
     QSqlQuery query("SELECT name FROM products");
@@ -94,65 +128,35 @@ bool stoking_p::eventFilter(QObject* obj, QEvent* event) {
         if (row < 0) return false;
 
         QStandardItemModel* model = qobject_cast<QStandardItemModel*>(ui->cartListTB->model());
+
         int qty = model->item(row, 2)->text().toInt();
         float price = model->item(row, 3)->text().toFloat();
 
         if (keyEvent->key() == Qt::Key_Plus) {
             qty++;
-        } else if (keyEvent->key() == Qt::Key_Minus && qty > 1) {
+        }
+        else if (keyEvent->key() == Qt::Key_Minus && qty > 1) {
             qty--;
-        } else {
-            return false;
         }
-
-        model->item(row, 2)->setText(QString::number(qty));
-        model->item(row, 4)->setText(QString::number(qty * price));
-        update_transaction_summary();
-        return true;
-    }
-    return QMainWindow::eventFilter(obj, event);
-}
-
-bool stoking_p::eventEnterFilter(QObject* obj, QEvent* event) {
-    if (obj == ui->cartListTB && event->type() == QEvent::KeyPress) {
-        QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
-
-        if (keyEvent->key() == Qt::Key_Enter) {
-            QString itemName = ui->searchShop->text();
-            if (itemName.isEmpty()) return false;
-
-            QSqlQuery query;
-            query.prepare("SELECT * FROM products WHERE name = ?");
-            query.addBindValue(itemName);
-
-            if (query.exec() && query.next()) {
-                QString name = query.value("name").toString();
-                QString type = query.value("item_type").toString();
-                int quantity = 1;
-                float price = query.value("price").toFloat();
-
-                QStandardItemModel* model = qobject_cast<QStandardItemModel*>(ui->cartListTB->model());
-                if (!model) {
-                    model = new QStandardItemModel(this);
-                    ui->cartListTB->setModel(model);
-                    model->setHorizontalHeaderLabels({"Name", "Type", "Quantity", "Price", "Subtotal"});
-                }
-
-                QList<QStandardItem*> row;
-                row << new QStandardItem(name)
-                    << new QStandardItem(type)
-                    << new QStandardItem(QString::number(quantity))
-                    << new QStandardItem(QString::number(price))
-                    << new QStandardItem(QString::number(quantity * price));
-                model->appendRow(row);
-
+        else if (keyEvent->key() == Qt::Key_Delete) {
+            auto response = QMessageBox::question(this, "Delete Confirmation", "Are you sure you want to delete this item?");
+            if (response == QMessageBox::Yes) {
+                model->removeRow(row);
                 update_transaction_summary();
-                ui->searchShop->clear();
+                return true;
             }
-        } else {
+        }
+        else {
             return false;
         }
+
+        model->setData(model->index(row, 2), qty);
+        double total = qty * price;
+        QString totalStr = QString::number(total, 'f', 2);
+        model->setData(model->index(row, 4), totalStr);
+
         update_transaction_summary();
+
         return true;
     }
     return QMainWindow::eventFilter(obj, event);
@@ -164,10 +168,10 @@ void stoking_p::update_transaction_summary() {
 
     float total = 0;
     for (int i = 0; i < model->rowCount(); ++i) {
-        total += model->item(i, 4)->text().toFloat(); // Subtotal
+        total += model->item(i, 4)->text().toFloat();
     }
 
-    ui->summaryLabel->setText(QString("Total: %1").arg(total));
+    ui->summaryLabel->setText(QString("Total: %1").arg(QString::number(total, 'f', 2)));
 }
 
 
@@ -232,7 +236,7 @@ void stoking_p::clear_form(){
 void stoking_p::setupHistoryTable() {
     // Create a model with custom data columns
     QStandardItemModel* model = new QStandardItemModel(ui->historyTable);
-    model->setHorizontalHeaderLabels({"Name", "Time", "Total Sold", "Net Profit"});
+    model->setHorizontalHeaderLabels({"Name", "Time", "Total Sold", "Total Expenss", "Net Profit"});
 
     QSqlQuery query("SELECT name, total, date, details FROM transactions ORDER BY date DESC");
 
@@ -283,9 +287,7 @@ void stoking_p::setupHistoryTable() {
     ui->historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->historyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->historyTable->horizontalHeader()->setStretchLastSection(true);
-
 }
-
 
 void stoking_p::setup_form(){
     clear_form();
@@ -512,6 +514,8 @@ void stoking_p::setup_connects(){
     // this connect is to add a small context menu that has the functions Edit and Delete to the product table
     connect(ui->itemListTB, &QTableView::customContextMenuRequested, this, &stoking_p::showContextMenuItemList);
 
+    connect(ui->cartListTB, &QTableView::customContextMenuRequested, this, &stoking_p::showContextMenuCartList);
+
     // this code gets the data based on the clicked row, and shows a table of bought items
     connect(ui->historyTable, &QTableView::clicked, this, [this](const QModelIndex& index) {
         int row = index.row();
@@ -574,6 +578,7 @@ void stoking_p::setup_connects(){
         if (response == QMessageBox::Yes) {
             ui->cartListTB->model()->removeRows(0, ui->cartListTB->model()->rowCount());
         }
+        update_transaction_summary();
     });
 
     // adds a new transaction and clears the cart
