@@ -53,7 +53,9 @@ void stoking_p::setup_cartTb(){
     if (!model) {
         model = new QStandardItemModel(this);
         ui->cartListTB->setModel(model);
-        model->setHorizontalHeaderLabels({"Name", "Type", "Quantity", "Price", "Subtotal"});
+        model->setHorizontalHeaderLabels({"Name", "Type", "Quantity", "Price", "Subtotal", "Expense", "Subexpense"});
+        ui->cartListTB->setColumnHidden(5, true);
+        ui->cartListTB->setColumnHidden(6, true);
     }
 
     ui->cartListTB->installEventFilter(this);
@@ -98,9 +100,13 @@ void stoking_p::showContextMenuCartList(const QPoint &pos){
         if (ok) {
             model->setData(model->index(index.row(), quantityColumn), newQty);
             float price = model->data(model->index(index.row(), 3)).toFloat();
+            float expense = model->data(model->index(index.row(), 5)).toFloat();
             double total = newQty * price;
+            double totalExpense = newQty * expense;
             QString totalStr = QString::number(total, 'f', 2);
+            QString totalExpenseStr = QString::number(totalExpense, 'f', 2);
             model->setData(model->index(index.row(), 4), totalStr);
+            model->setData(model->index(index.row(), 6), totalExpenseStr);
         }
     }
     update_transaction_summary();
@@ -130,7 +136,6 @@ bool stoking_p::eventFilter(QObject* obj, QEvent* event) {
         QStandardItemModel* model = qobject_cast<QStandardItemModel*>(ui->cartListTB->model());
 
         int qty = model->item(row, 2)->text().toInt();
-        float price = model->item(row, 3)->text().toFloat();
 
         if (keyEvent->key() == Qt::Key_Plus) {
             qty++;
@@ -150,10 +155,14 @@ bool stoking_p::eventFilter(QObject* obj, QEvent* event) {
             return false;
         }
 
-        model->setData(model->index(row, 2), qty);
+        float price = model->data(model->index(row, 3)).toFloat();
+        float expense = model->data(model->index(row, 5)).toFloat();
         double total = qty * price;
+        double totalExpense = qty * expense;
         QString totalStr = QString::number(total, 'f', 2);
+        QString totalExpenseStr = QString::number(totalExpense, 'f', 2);
         model->setData(model->index(row, 4), totalStr);
+        model->setData(model->index(row, 6), totalExpenseStr);
 
         update_transaction_summary();
 
@@ -238,42 +247,22 @@ void stoking_p::setupHistoryTable() {
     QStandardItemModel* model = new QStandardItemModel(ui->historyTable);
     model->setHorizontalHeaderLabels({"Name", "Time", "Total Sold", "Total Expenss", "Net Profit"});
 
-    QSqlQuery query("SELECT name, total, date, details FROM transactions ORDER BY date DESC");
+    QSqlQuery query("SELECT name, total, total_expense, date, details FROM transactions ORDER BY date DESC");
 
     while (query.next()) {
         QString name = query.value(0).toString();
         double totalSold = query.value(1).toDouble();
-        QString date = query.value(2).toString();
-        QString detailsJson = query.value(3).toString();
+        double totalExpense = query.value(2).toDouble();
+        QString date = query.value(3).toString();
+        QString detailsJson = query.value(4).toString();
 
-        // Calculate net profit by parsing details
-        double profit = 0.0;
-        QJsonParseError error;
-        QJsonDocument doc = QJsonDocument::fromJson(detailsJson.toUtf8(), &error);
-        if (error.error == QJsonParseError::NoError && doc.isArray()) {
-            QJsonArray items = doc.array();
-            for (const QJsonValue& val : items) {
-                QJsonObject item = val.toObject();
-                QString itemName = item["name"].toString();
-                int qty = item["quantity"].toInt();
-                double sellPrice = item["price"].toDouble();
-
-                QSqlQuery prodQuery;
-                prodQuery.prepare("SELECT bought FROM products WHERE name = ?");
-                prodQuery.addBindValue(itemName);
-                double cost = 0.0;
-                if (prodQuery.exec() && prodQuery.next()) {
-                    cost = prodQuery.value(0).toDouble();
-                }
-
-                profit += (sellPrice - cost) * qty;
-            }
-        }
+        double profit = totalSold - totalExpense;
 
         QList<QStandardItem*> rowItems;
         rowItems << new QStandardItem(name)
                  << new QStandardItem(date)
                  << new QStandardItem(QString::number(totalSold, 'f', 2))
+                 << new QStandardItem(QString::number(totalExpense, 'f', 2))
                  << new QStandardItem(QString::number(profit, 'f', 2));
 
         // Store details JSON as user data on the row for later
@@ -537,30 +526,28 @@ void stoking_p::setup_connects(){
 
         auto* layout = new QVBoxLayout(dialog);
         auto* table = new QTableView(dialog);
-        auto* detailModel = new QStandardItemModel(items.size(), 5, dialog);
-        detailModel->setHorizontalHeaderLabels({"Item", "Quantity", "Sell Price", "Cost Price", "Profit"});
+        auto* detailModel = new QStandardItemModel(items.size(), 7, dialog);
+        detailModel->setHorizontalHeaderLabels(
+            {"Item", "Quantity", "Sell Price", "Total Sold", "Cost Price", "Total Expense", "Profit"});
 
         for (int i = 0; i < items.size(); ++i) {
             QJsonObject item = items[i].toObject();
             QString itemName = item["name"].toString();
             int quantity = item["quantity"].toInt();
             double price = item["price"].toDouble();
-            double cost = 0.0;
+            double cost = item["cost"].toDouble();
 
-            QSqlQuery costQuery;
-            costQuery.prepare("SELECT bought FROM products WHERE name = ?");
-            costQuery.addBindValue(itemName);
-            if (costQuery.exec() && costQuery.next()) {
-                cost = costQuery.value(0).toDouble();
-            }
-
-            double profit = (price - cost) * quantity;
+            double totalSold = item["subtotal"].toDouble();
+            double totalExpense = item["subexpense"].toDouble();
+            double profit = totalSold - totalExpense;
 
             detailModel->setItem(i, 0, new QStandardItem(itemName));
             detailModel->setItem(i, 1, new QStandardItem(QString::number(quantity)));
             detailModel->setItem(i, 2, new QStandardItem(QString::number(price, 'f', 2)));
-            detailModel->setItem(i, 3, new QStandardItem(QString::number(cost, 'f', 2)));
-            detailModel->setItem(i, 4, new QStandardItem(QString::number(profit, 'f', 2)));
+            detailModel->setItem(i, 3, new QStandardItem(QString::number(totalSold, 'f', 2)));
+            detailModel->setItem(i, 4, new QStandardItem(QString::number(cost, 'f', 2)));
+            detailModel->setItem(i, 5, new QStandardItem(QString::number(totalExpense, 'f', 2)));
+            detailModel->setItem(i, 6, new QStandardItem(QString::number(profit, 'f', 2)));
         }
 
         table->setModel(detailModel);
@@ -589,7 +576,8 @@ void stoking_p::setup_connects(){
             return;
         }
 
-        float total = 0;
+        float totalsold = 0;
+        float totalcost = 0;
         QJsonArray items;
 
         QSqlDatabase db = QSqlDatabase::database();
@@ -600,14 +588,19 @@ void stoking_p::setup_connects(){
             QString name = model->item(i, 0)->text();
             int qtyPurchased = model->item(i, 2)->text().toInt();
             float price = model->item(i, 3)->text().toFloat();
-            float subtotal = qtyPurchased * price;
-            total += subtotal;
+            float subtotal = model->item(i, 4)->text().toFloat();
+            float cost = model->item(i, 5)->text().toFloat();
+            float subexpense = model->item(i, 6)->text().toFloat();
+            totalsold += subtotal;
+            totalcost += subexpense;
 
             QJsonObject itemObj;
             itemObj["name"] = name;
             itemObj["quantity"] = qtyPurchased;
             itemObj["price"] = price;
+            itemObj["cost"] = cost;
             itemObj["subtotal"] = subtotal;
+            itemObj["subexpense"] = subexpense;
             items.append(itemObj);
 
             // Step 1: Get current stock
@@ -643,10 +636,11 @@ void stoking_p::setup_connects(){
         QJsonDocument doc(items);
         QString details = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
 
-        query.prepare("INSERT INTO transactions (name, details, total) VALUES (?, ?, ?)");
+        query.prepare("INSERT INTO transactions (name, details, total, total_expense) VALUES (?, ?, ?, ?)");
         query.addBindValue(transName);
         query.addBindValue(details);
-        query.addBindValue(total);
+        query.addBindValue(totalsold);
+        query.addBindValue(totalcost);
 
         if (!query.exec()) {
             QMessageBox::critical(this, "Error", "Failed to save transaction.");
@@ -683,12 +677,15 @@ void stoking_p::setup_connects(){
             QString type = query.value("item_type").toString();
             int quantity = 1;
             float price = query.value("price").toFloat();
+            float cost = query.value("bought").toFloat();
 
             QStandardItemModel* model = qobject_cast<QStandardItemModel*>(ui->cartListTB->model());
             if (!model) {
                 model = new QStandardItemModel(this);
                 ui->cartListTB->setModel(model);
-                model->setHorizontalHeaderLabels({"Name", "Type", "Quantity", "Price", "Subtotal"});
+                model->setHorizontalHeaderLabels({"Name", "Type", "Quantity", "Price", "Subtotal", "Expense", "Subexpense"});
+                ui->cartListTB->setColumnHidden(5, true);
+                ui->cartListTB->setColumnHidden(6, true);
             }
 
             QList<QStandardItem*> row;
@@ -696,7 +693,9 @@ void stoking_p::setup_connects(){
                 << new QStandardItem(type)
                 << new QStandardItem(QString::number(quantity))
                 << new QStandardItem(QString::number(price))
-                << new QStandardItem(QString::number(quantity * price));
+                << new QStandardItem(QString::number(quantity * price))
+                << new QStandardItem(QString::number(cost))
+                << new QStandardItem(QString::number(quantity * cost));
             model->appendRow(row);
 
             update_transaction_summary();
@@ -741,6 +740,7 @@ void start_db(){
             name TEXT,
             details TEXT, -- JSON or CSV of items
             total REAL,
+            total_expense,
             date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     )";
