@@ -15,6 +15,11 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QInputDialog>
+#include <QTextEdit>
+#include <QFileDialog>
+#include <QPrinter>
+#include <QPrintDialog>
+#include <QDesktopServices>
 
 void start_db();
 void close_db();
@@ -62,6 +67,7 @@ void stoking_p::setup_cartTb(){
     ui->cartListTB->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->cartListTB->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->cartListTB->horizontalHeader()->setStretchLastSection(true);
+    ui->cartListTB->verticalHeader()->setVisible(false);
 }
 
 void stoking_p::showContextMenuCartList(const QPoint &pos){
@@ -510,6 +516,7 @@ void stoking_p::setup_connects(){
         int row = index.row();
         QStandardItemModel* m = qobject_cast<QStandardItemModel*>(ui->historyTable->model());
         QString detailsJson = m->item(row, 0)->data(Qt::UserRole + 1).toString();
+        QString transactionName = m->item(row, 1)->text(); // Assuming column 1 has the transaction name
 
         QJsonParseError error;
         QJsonDocument doc = QJsonDocument::fromJson(detailsJson.toUtf8(), &error);
@@ -520,7 +527,7 @@ void stoking_p::setup_connects(){
 
         QJsonArray items = doc.array();
 
-        // Create dialog to show details in a table
+        // Create dialog
         auto* dialog = new QDialog(this);
         dialog->setWindowTitle("Transaction Items");
 
@@ -536,7 +543,6 @@ void stoking_p::setup_connects(){
             int quantity = item["quantity"].toInt();
             double price = item["price"].toDouble();
             double cost = item["cost"].toDouble();
-
             double totalSold = item["subtotal"].toDouble();
             double totalExpense = item["subexpense"].toDouble();
             double profit = totalSold - totalExpense;
@@ -552,12 +558,71 @@ void stoking_p::setup_connects(){
 
         table->setModel(detailModel);
         table->resizeColumnsToContents();
-
         layout->addWidget(table);
+
+        // Add button to print invoice
+        QPushButton* printButton = new QPushButton("Print Invoice", dialog);
+        layout->addWidget(printButton);
+
+        // Connect button to print functionality
+        connect(printButton, &QPushButton::clicked, this, [this, items, transactionName]() {
+            QString invoiceHtml = "<h2>Invoice - " + transactionName + "</h2>";
+            invoiceHtml += "<table border='1' cellpadding='4' cellspacing='0' width='100%'>";
+            invoiceHtml += "<tr><th>Item</th><th>Quantity</th><th>Price</th><th>Total</th></tr>";
+
+            double grandTotal = 0.0;
+
+            for (const QJsonValue& val : items) {
+                QJsonObject item = val.toObject();
+                QString name = item["name"].toString();
+                int qty = item["quantity"].toInt();
+                double price = item["price"].toDouble();
+                double total = item["subtotal"].toDouble();
+                grandTotal += total;
+
+                invoiceHtml += QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td></tr>")
+                                   .arg(name)
+                                   .arg(qty)
+                                   .arg(QString::number(price, 'f', 2))
+                                   .arg(QString::number(total, 'f', 2));
+            }
+
+            invoiceHtml += QString("<tr><td colspan='3'><b>Grand Total</b></td><td><b>%1</b></td></tr>")
+                               .arg(QString::number(grandTotal, 'f', 2));
+            invoiceHtml += "</table>";
+
+            // Ask user where to save the PDF
+            QString filePath = QFileDialog::getSaveFileName(nullptr, "Save Invoice as PDF", "", "PDF Files (*.pdf)");
+            if (filePath.isEmpty()) {
+                return; // User canceled
+            }
+
+            if (!filePath.endsWith(".pdf", Qt::CaseInsensitive)) {
+                filePath += ".pdf";
+            }
+
+            // Generate PDF using QTextDocument
+            QTextDocument doc;
+            doc.setHtml(invoiceHtml);
+
+            QPrinter printer(QPrinter::HighResolution);
+            printer.setOutputFormat(QPrinter::PdfFormat);
+            printer.setOutputFileName(filePath);
+
+            doc.print(&printer);
+
+            QMessageBox::information(nullptr, "Invoice Saved", "Invoice PDF has been saved to:\n" + filePath);
+
+            // Optional: Open the PDF after saving (platform-dependent)
+            QDesktopServices::openUrl(QUrl::fromLocalFile(filePath));
+        });
+
+
         dialog->setLayout(layout);
         dialog->resize(600, 400);
         dialog->exec();
     });
+
 
     // clears the cart
     connect(ui->clearCart, &QPushButton::clicked, this, [this](){
