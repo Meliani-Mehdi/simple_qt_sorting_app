@@ -24,12 +24,6 @@
 void start_db();
 void close_db();
 
-struct FinancialSummary {
-    double income = 0.0;
-    double expenses = 0.0;
-    double total = 0.0;
-};
-
 stoking_p::stoking_p(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::stoking_p)
@@ -506,6 +500,27 @@ void stoking_p::setup_connects(){
         ui->windowHolder->setCurrentIndex(HistoryPage);
     });
 
+    // TODAY
+    connect(ui->income_today, &QPushButton::clicked, this, [=]() {
+        getFinancialSummaryAndShow("DATE(date) = DATE('now')");
+    });
+
+    // THIS MONTH
+    connect(ui->income_month, &QPushButton::clicked, this, [=]() {
+        getFinancialSummaryAndShow("DATE(date) >= DATE('now', '-1 month')");
+    });
+
+    // PAST 3 MONTHS
+    connect(ui->income_3months, &QPushButton::clicked, this, [=]() {
+        getFinancialSummaryAndShow("DATE(date) >= DATE('now', '-3 months')");
+    });
+
+    // THIS YEAR
+    connect(ui->income_year, &QPushButton::clicked, this, [=]() {
+        getFinancialSummaryAndShow("DATE(date) >= DATE('now', '-1 year')");
+    });
+
+
     // this connect is to add a small context menu that has the functions Edit and Delete to the product table
     connect(ui->itemListTB, &QTableView::customContextMenuRequested, this, &stoking_p::showContextMenuItemList);
 
@@ -819,48 +834,74 @@ void start_db(){
     }
 }
 
-FinancialSummary getFinancialSummary(const QString& condition) {
-    FinancialSummary summary;
-    QSqlQuery transactionQuery;
+void stoking_p::showFinancialSummaryWindow(double revenue, double expenses, double netProfit) {
+    QDialog* dialog = new QDialog;
+    dialog->setWindowTitle("Financial Summary");
 
-    QString queryStr = "SELECT details FROM transactions WHERE " + condition;
-    if (!transactionQuery.exec(queryStr)) {
-        qDebug() << "Transaction query failed:" << transactionQuery.lastError();
-        return summary;
+    QVBoxLayout* layout = new QVBoxLayout(dialog);
+
+    QLabel* revenueLabel = new QLabel(QString("Total Revenue: %1 DZD").arg(revenue, 0, 'f', 2));
+    QLabel* expensesLabel = new QLabel(QString("Total Expenses: %1 DZD").arg(expenses, 0, 'f', 2));
+    QLabel* profitLabel = new QLabel(QString("Net Profit: %1 DZD").arg(netProfit, 0, 'f', 2));
+
+    QFont font;
+    font.setPointSize(12);
+    font.setBold(true);
+
+    revenueLabel->setFont(font);
+    expensesLabel->setFont(font);
+    profitLabel->setFont(font);
+
+    layout->addWidget(revenueLabel);
+    layout->addWidget(expensesLabel);
+    layout->addWidget(profitLabel);
+
+    dialog->setLayout(layout);
+    dialog->exec();
+}
+
+void stoking_p::getFinancialSummaryAndShow(const QString& periodCondition) {
+    QSqlQuery query;
+    QString queryString = "SELECT details FROM transactions";
+
+    if (!periodCondition.isEmpty()) {
+        queryString += " WHERE " + periodCondition;
     }
 
-    while (transactionQuery.next()) {
-        QString detailsJson = transactionQuery.value(0).toString();
-        QJsonParseError parseError;
-        QJsonDocument doc = QJsonDocument::fromJson(detailsJson.toUtf8(), &parseError);
-        if (parseError.error != QJsonParseError::NoError || !doc.isArray())
+    if (!query.exec(queryString)) {
+        qDebug() << "Database query failed:" << query.lastError();
+        return;
+    }
+
+    double totalRevenue = 0.0;
+    double totalExpenses = 0.0;
+
+    while (query.next()) {
+        QString detailsJson = query.value(0).toString();
+        QJsonParseError error;
+        QJsonDocument doc = QJsonDocument::fromJson(detailsJson.toUtf8(), &error);
+
+        if (error.error != QJsonParseError::NoError || !doc.isArray()) {
+            qDebug() << "Invalid JSON in transaction details.";
             continue;
+        }
 
         QJsonArray items = doc.array();
+
         for (const QJsonValue& val : items) {
             QJsonObject item = val.toObject();
-            QString name = item["name"].toString();
-            int quantity = item["quantity"].toInt();
-            double sellPrice = item["price"].toDouble();
+            double subtotal = item["subtotal"].toDouble();
+            double subexpense = item["subexpense"].toDouble();
 
-            QSqlQuery productQuery;
-            productQuery.prepare("SELECT bought FROM products WHERE name = ?");
-            productQuery.addBindValue(name);
-            double boughtPrice = 0.0;
-
-            if (productQuery.exec() && productQuery.next())
-                boughtPrice = productQuery.value(0).toDouble();
-
-            double revenue = sellPrice * quantity;
-            double cost = boughtPrice * quantity;
-
-            summary.income += revenue;
-            summary.expenses += cost;
+            totalRevenue += subtotal;
+            totalExpenses += subexpense;
         }
     }
 
-    summary.total = summary.income - summary.expenses;
-    return summary;
+    double netProfit = totalRevenue - totalExpenses;
+
+    // Show the popup window
+    showFinancialSummaryWindow(totalRevenue, totalExpenses, netProfit);
 }
 
 
