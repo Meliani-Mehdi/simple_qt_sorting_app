@@ -22,79 +22,295 @@
   <property name="styleSheet">
    <string notr="true">/* GENERAL */
 QWidget {
-    background-color: #f4f6f8;
-    font-family: &quot;Segoe UI&quot;, &quot;Arial&quot;;
+    background-color: #ffffff;
+    font-family: &quot;Segoe UI&quot;, &quot;Arial&quot;, sans-serif;
     font-size: 14px;
-    color: #333;
+    color: #1a1d29;
+}
+
+QMainWindow {
+    background-color: #f4f6f9;
 }
 
 /* LABELS */
 QLabel {
-    color: #222;
+    color: #1a1d29;
     font-weight: 500;
+    background: transparent;
 }
 
 /* LINE EDITS */
 QLineEdit {
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    padding: 6px 8px;
-    background-color: #fff;
+    border: 1px solid #d1d9e0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    background-color: #ffffff;
+    font-size: 14px;
+    color: #1a1d29;
+    selection-background-color: #6366f1;
+    selection-color: white;
 }
 QLineEdit:focus {
-    border: 1px solid #0078d7;
+    border: 2px solid #6366f1;
+    background-color: #ffffff;
+}
+QLineEdit:hover {
+    border: 1px solid #9ca3af;
 }
 
 /* BUTTONS */
 QPushButton {
-    background-color: #0078d7;
+    background-color: #6366f1;
     color: white;
-    padding: 6px 12px;
+    padding: 12px 20px;
     border: none;
-    border-radius: 5px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    min-height: 18px;
 }
 QPushButton:hover {
-    background-color: #005fa3;
+    background-color: #4f46e5;
 }
 QPushButton:pressed {
-    background-color: #004f87;
+    background-color: #3730a3;
 }
 
-/* TABLES */
-QTableWidget {
-    background-color: #ffffff;
-    border: 1px solid #ccc;
-    gridline-color: #ccc;
-    selection-background-color: #d0e7ff;
-    alternate-background-color: #f9f9f9;
-}
-QHeaderView::section {
-    background-color: #e8eaec;
-    padding: 6px;
-    border: 1px solid #dcdcdc;
+/* SPECIAL BUTTON STYLES */
+QPushButton#addCartItem {
+    background-color: #10b981;
+    font-size: 18px;
     font-weight: bold;
+    min-width: 40px;
+    max-width: 40px;
+    padding: 10px;
+    border-radius: 6px;
+}
+QPushButton#addCartItem:hover {
+    background-color: #059669;
 }
 
-/* IMAGE PREVIEW LABEL (Assumes objectName = imageLabel) */
-QLabel#imageLabel {
-    border: 1px dashed #aaa;
-    background-color: #fff;
-    min-width: 100px;
-    min-height: 100px;
+QPushButton#clearCart {
+    background-color: #ef4444;
+}
+QPushButton#clearCart:hover {
+    background-color: #dc2626;
 }
 
-/* SCROLLBARS (optional for table scrolling) */
+/* TABLES - COMPLETELY REDESIGNED */
+QTableWidget, QTableView {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    gridline-color: #f3f4f6;
+    selection-background-color: #eef2ff;
+    alternate-background-color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    show-decoration-selected: 1;
+}
+
+QTableWidget::item, QTableView::item {
+    border: none;
+    padding: 12px 8px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+QTableWidget::item:selected, QTableView::item:selected {
+    background-color: #eef2ff;
+    color: #1e40af;
+}
+
+QTableWidget::item:hover, QTableView::item:hover {
+    background-color: #f8fafc;
+}
+
+QHeaderView {
+    background-color: transparent;
+}
+
+QHeaderView::section {
+    background-color: #f8fafc;
+    padding: 12px;
+    border: none;
+    border-bottom: 2px solid #e5e7eb;
+    border-right: 1px solid #f3f4f6;
+    font-weight: 700;
+    color: #374151;
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    line-height: 20px; /* match or exceed font-size */
+}
+
+QHeaderView::section:first {
+    border-left: none;
+    border-top-left-radius: 12px;
+}
+
+QHeaderView::section:last {
+    border-right: none;
+    border-top-right-radius: 12px;
+}
+
+QHeaderView::section:hover {
+    background-color: #f1f5f9;
+}
+
+/* Table Corner Button */
+QTableWidget QTableCornerButton::section, QTableView QTableCornerButton::section {
+    background-color: #f8fafc;
+    border: none;
+    border-bottom: 2px solid #e5e7eb;
+    border-right: 1px solid #f3f4f6;
+    border-top-left-radius: 12px;
+}
+
+/* FRAMES */
+QFrame {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    background-color: #ffffff;
+    padding: 4px;
+}
+
+/* SCROLL AREAS */
+QScrollArea {
+    border: 2px solid #e9ecef;
+    background-color: #ffffff;
+}
+
+QScrollArea QWidget {
+    background-color: transparent;
+}
+
+/* SCROLLBARS */
 QScrollBar:vertical, QScrollBar:horizontal {
-    background: #e0e0e0;
+    background: #ecf0f1;
     border: none;
     width: 10px;
-}
-QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
-    background: #aaa;
     border-radius: 5px;
 }
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: #bdc3c7;
+    border-radius: 5px;
+    min-height: 20px;
+}
 QScrollBar::handle:hover {
-    background: #888;
+    background: #95a5a6;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    border: none;
+    background: none;
+}
+
+/* SPINBOX */
+QSpinBox {
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    padding: 8px 12px;
+    background-color: #ffffff;
+    font-size: 14px;
+    color: #2c3e50;
+}
+QSpinBox:focus {
+    border: 2px solid #3498db;
+}
+QSpinBox::up-button, QSpinBox::down-button {
+    border: none;
+    background: #ecf0f1;
+    width: 18px;
+    border-radius: 3px;
+}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background: #d5dbdb;
+}
+
+/* STACKED WIDGET */
+QStackedWidget {
+    background: transparent;
+    border: none;
+}
+
+/* SPECIFIC STYLING */
+QWidget#widget {
+    background-color: #34495e;
+    border-bottom: 3px solid #2c3e50;
+}
+
+QLabel#title_p {
+    color: #ffffff !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    background: transparent;
+}
+
+QScrollArea#windowButtonsHolder {
+    background-color: #2c3e50;
+    border: none;
+	border-radius: 0px;
+    border-right: 3px solid #34495e;
+}
+
+QScrollArea#windowButtonsHolder QPushButton {
+    background: transparent;
+    color: #ecf0f1;
+    border: none;
+    border-radius: 8px;
+    text-align: left;
+    padding: 12px 16px;
+    margin: 2px;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+QScrollArea#windowButtonsHolder QPushButton:hover {
+    background-color: #34495e;
+    color: #ffffff;
+}
+
+QScrollArea#windowButtonsHolder QPushButton:pressed {
+    background-color: #5d6d7e;
+}
+
+QLabel#IncertMode_lb {
+    font-size: 16px;
+    font-weight: 700;
+    color: #2c3e50;
+    background-color: #ecf0f1;
+    padding: 12px;
+    border-radius: 6px;
+    border: 2px solid #bdc3c7;
+}
+
+QLabel#summaryLabel {
+    font-size: 14px;
+    font-weight: 500;
+    color: #2c3e50;
+    background-color: #f8f9fa;
+    padding: 12px;
+    border-radius: 6px;
+    border: 2px solid #e9ecef;
+}
+
+QLabel#label {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #2c3e50 !important;
+    background: transparent !important;
+}
+
+QFrame#income_btns {
+    background-color: #f8f9fa;
+}
+
+QFrame#income_btns QPushButton {
+    background-color: #3498db;
+    margin: 2px 0;
+}
+
+QFrame#income_btns QPushButton:hover {
+    background-color: #2980b9;
 }
 </string>
   </property>
@@ -120,26 +336,39 @@ QScrollBar::handle:hover {
       <property name="minimumSize">
        <size>
         <width>0</width>
-        <height>64</height>
+        <height>80</height>
        </size>
       </property>
       <property name="maximumSize">
        <size>
         <width>16777215</width>
-        <height>64</height>
+        <height>80</height>
        </size>
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <property name="leftMargin">
+        <number>24</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>24</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="QLabel" name="title_p">
          <property name="focusPolicy">
           <enum>Qt::FocusPolicy::WheelFocus</enum>
          </property>
          <property name="styleSheet">
-          <string notr="true">font-size: 21px;
-font-weight: bold;
-color: #0078d7;
-</string>
+          <string notr="true">font-size: 24px;
+font-weight: 700;
+color: #ffffff;
+text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+margin: 12px;</string>
          </property>
          <property name="text">
           <string>STOKING PRODUCTS</string>
@@ -192,39 +421,39 @@ color: #0078d7;
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>198</width>
-           <height>652</height>
+           <width>186</width>
+           <height>624</height>
           </rect>
          </property>
          <property name="styleSheet">
           <string notr="true">QPushButton {
-font-size: 18px;
-font-weight: bold;
-color: #fff;
+font-size: 15px;
+font-weight: 600;
+color: #e2e8f0;
 }</string>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,0,0,1">
           <property name="spacing">
-           <number>4</number>
+           <number>8</number>
           </property>
           <property name="leftMargin">
-           <number>8</number>
+           <number>12</number>
           </property>
           <property name="topMargin">
-           <number>8</number>
+           <number>24</number>
           </property>
           <property name="rightMargin">
-           <number>8</number>
+           <number>12</number>
           </property>
           <property name="bottomMargin">
-           <number>8</number>
+           <number>24</number>
           </property>
           <item>
            <widget class="QPushButton" name="ShoppingCart">
             <property name="minimumSize">
              <size>
               <width>0</width>
-              <height>48</height>
+              <height>46</height>
              </size>
             </property>
             <property name="cursor">
@@ -240,7 +469,7 @@ color: #fff;
             <property name="minimumSize">
              <size>
               <width>0</width>
-              <height>48</height>
+              <height>46</height>
              </size>
             </property>
             <property name="cursor">
@@ -256,7 +485,7 @@ color: #fff;
             <property name="minimumSize">
              <size>
               <width>0</width>
-              <height>48</height>
+              <height>46</height>
              </size>
             </property>
             <property name="cursor">
@@ -287,27 +516,51 @@ color: #fff;
       <item>
        <widget class="QStackedWidget" name="windowHolder">
         <property name="currentIndex">
-         <number>2</number>
+         <number>1</number>
         </property>
         <widget class="QWidget" name="shopingWindow">
          <layout class="QHBoxLayout" name="horizontalLayout_4">
+          <property name="spacing">
+           <number>20</number>
+          </property>
+          <property name="leftMargin">
+           <number>24</number>
+          </property>
+          <property name="topMargin">
+           <number>24</number>
+          </property>
+          <property name="rightMargin">
+           <number>24</number>
+          </property>
+          <property name="bottomMargin">
+           <number>24</number>
+          </property>
           <item>
            <layout class="QVBoxLayout" name="cartMainWindow">
+            <property name="spacing">
+             <number>16</number>
+            </property>
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_3">
+              <property name="spacing">
+               <number>12</number>
+              </property>
               <item>
                <widget class="QLineEdit" name="searchShop">
                 <property name="minimumSize">
                  <size>
                   <width>0</width>
-                  <height>32</height>
+                  <height>40</height>
                  </size>
                 </property>
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>32</height>
+                  <height>40</height>
                  </size>
+                </property>
+                <property name="placeholderText">
+                 <string>Search items to add to cart...</string>
                 </property>
                </widget>
               </item>
@@ -315,14 +568,14 @@ color: #fff;
                <widget class="QPushButton" name="addCartItem">
                 <property name="minimumSize">
                  <size>
-                  <width>0</width>
-                  <height>32</height>
+                  <width>60</width>
+                  <height>38</height>
                  </size>
                 </property>
                 <property name="maximumSize">
                  <size>
-                  <width>16777215</width>
-                  <height>32</height>
+                  <width>60</width>
+                  <height>40</height>
                  </size>
                 </property>
                 <property name="font">
@@ -345,20 +598,20 @@ color: #fff;
                 <property name="minimumSize">
                  <size>
                   <width>0</width>
-                  <height>32</height>
+                  <height>42</height>
                  </size>
                 </property>
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>32</height>
+                  <height>40</height>
                  </size>
                 </property>
                 <property name="cursor">
                  <cursorShape>PointingHandCursor</cursorShape>
                 </property>
                 <property name="text">
-                 <string>CLEAR</string>
+                 <string>CLEAR CART</string>
                 </property>
                </widget>
               </item>
@@ -373,13 +626,13 @@ color: #fff;
            <widget class="QFrame" name="transaction_window">
             <property name="minimumSize">
              <size>
-              <width>250</width>
+              <width>280</width>
               <height>0</height>
              </size>
             </property>
             <property name="maximumSize">
              <size>
-              <width>250</width>
+              <width>280</width>
               <height>16777215</height>
              </size>
             </property>
@@ -390,8 +643,27 @@ color: #fff;
              <enum>QFrame::Shadow::Raised</enum>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_6" stretch="0,2,0,1,0,16">
+             <property name="spacing">
+              <number>16</number>
+             </property>
+             <property name="leftMargin">
+              <number>20</number>
+             </property>
+             <property name="topMargin">
+              <number>20</number>
+             </property>
+             <property name="rightMargin">
+              <number>20</number>
+             </property>
+             <property name="bottomMargin">
+              <number>20</number>
+             </property>
              <item>
-              <widget class="QLineEdit" name="transactionNameLineEdit"/>
+              <widget class="QLineEdit" name="transactionNameLineEdit">
+               <property name="placeholderText">
+                <string>Customer name...</string>
+               </property>
+              </widget>
              </item>
              <item>
               <spacer name="verticalSpacer_6">
@@ -409,7 +681,7 @@ color: #fff;
              <item>
               <widget class="QLabel" name="summaryLabel">
                <property name="text">
-                <string/>
+                <string>Order Summary</string>
                </property>
               </widget>
              </item>
@@ -431,7 +703,7 @@ color: #fff;
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>48</height>
+                 <height>42</height>
                 </size>
                </property>
                <property name="maximumSize">
@@ -468,23 +740,47 @@ color: #fff;
         </widget>
         <widget class="QWidget" name="itemsWindow">
          <layout class="QHBoxLayout" name="horizontalLayout_6">
+          <property name="spacing">
+           <number>20</number>
+          </property>
+          <property name="leftMargin">
+           <number>24</number>
+          </property>
+          <property name="topMargin">
+           <number>24</number>
+          </property>
+          <property name="rightMargin">
+           <number>24</number>
+          </property>
+          <property name="bottomMargin">
+           <number>24</number>
+          </property>
           <item>
            <layout class="QVBoxLayout" name="verticalLayout_4">
+            <property name="spacing">
+             <number>16</number>
+            </property>
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_5">
+              <property name="spacing">
+               <number>12</number>
+              </property>
               <item>
                <widget class="QLineEdit" name="searchItem">
                 <property name="minimumSize">
                  <size>
                   <width>0</width>
-                  <height>32</height>
+                  <height>40</height>
                  </size>
                 </property>
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>32</height>
+                  <height>40</height>
                  </size>
+                </property>
+                <property name="placeholderText">
+                 <string>Search store items...</string>
                 </property>
                </widget>
               </item>
@@ -493,20 +789,20 @@ color: #fff;
                 <property name="minimumSize">
                  <size>
                   <width>0</width>
-                  <height>32</height>
+                  <height>42</height>
                  </size>
                 </property>
                 <property name="maximumSize">
                  <size>
                   <width>16777215</width>
-                  <height>32</height>
+                  <height>40</height>
                  </size>
                 </property>
                 <property name="cursor">
                  <cursorShape>PointingHandCursor</cursorShape>
                 </property>
                 <property name="text">
-                 <string>ADD A NEW ITEM</string>
+                 <string>ADD NEW ITEM</string>
                 </property>
                </widget>
               </item>
@@ -521,13 +817,13 @@ color: #fff;
            <widget class="QFrame" name="editor">
             <property name="minimumSize">
              <size>
-              <width>250</width>
+              <width>280</width>
               <height>0</height>
              </size>
             </property>
             <property name="maximumSize">
              <size>
-              <width>250</width>
+              <width>280</width>
               <height>16777215</height>
              </size>
             </property>
@@ -539,7 +835,19 @@ color: #fff;
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_5" stretch="0,1,0,0,0,0,0,0,0,0,0,0,1,0,8">
              <property name="spacing">
-              <number>10</number>
+              <number>12</number>
+             </property>
+             <property name="leftMargin">
+              <number>20</number>
+             </property>
+             <property name="topMargin">
+              <number>20</number>
+             </property>
+             <property name="rightMargin">
+              <number>20</number>
+             </property>
+             <property name="bottomMargin">
+              <number>20</number>
              </property>
              <item>
               <widget class="QLabel" name="IncertMode_lb">
@@ -642,7 +950,7 @@ color: #fff;
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>48</height>
+                 <height>42</height>
                 </size>
                </property>
                <property name="maximumSize">
@@ -679,6 +987,21 @@ color: #fff;
         </widget>
         <widget class="QWidget" name="historyWindow">
          <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <property name="spacing">
+           <number>20</number>
+          </property>
+          <property name="leftMargin">
+           <number>24</number>
+          </property>
+          <property name="topMargin">
+           <number>24</number>
+          </property>
+          <property name="rightMargin">
+           <number>24</number>
+          </property>
+          <property name="bottomMargin">
+           <number>24</number>
+          </property>
           <item>
            <widget class="QTableView" name="historyTable"/>
           </item>
@@ -686,20 +1009,20 @@ color: #fff;
            <widget class="QFrame" name="income_btns">
             <property name="minimumSize">
              <size>
-              <width>250</width>
+              <width>280</width>
               <height>0</height>
              </size>
             </property>
             <property name="maximumSize">
              <size>
-              <width>250</width>
+              <width>280</width>
               <height>16777215</height>
              </size>
             </property>
             <property name="styleSheet">
              <string notr="true">QPushButton {
-font-size: 18px;
-font-weight: bold;
+font-size: 15px;
+font-weight: 600;
 color: #fff;
 }</string>
             </property>
@@ -710,16 +1033,31 @@ color: #fff;
              <enum>QFrame::Shadow::Raised</enum>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,0,0,0,0,1">
+             <property name="spacing">
+              <number>12</number>
+             </property>
+             <property name="leftMargin">
+              <number>20</number>
+             </property>
+             <property name="topMargin">
+              <number>20</number>
+             </property>
+             <property name="rightMargin">
+              <number>20</number>
+             </property>
+             <property name="bottomMargin">
+              <number>20</number>
+             </property>
              <item>
               <widget class="QLabel" name="label">
                <property name="styleSheet">
                 <string notr="true">QLabel {
 font-size: 18px;
-font-weight: bold;
+font-weight: 700;
 }</string>
                </property>
                <property name="text">
-                <string>Income of:</string>
+                <string>Income Reports</string>
                </property>
               </widget>
              </item>
@@ -728,7 +1066,7 @@ font-weight: bold;
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>48</height>
+                 <height>46</height>
                 </size>
                </property>
                <property name="maximumSize">
@@ -747,7 +1085,7 @@ font-weight: bold;
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>48</height>
+                 <height>46</height>
                 </size>
                </property>
                <property name="maximumSize">
@@ -766,7 +1104,7 @@ font-weight: bold;
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>48</height>
+                 <height>46</height>
                 </size>
                </property>
                <property name="maximumSize">
@@ -785,7 +1123,7 @@ font-weight: bold;
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>48</height>
+                 <height>46</height>
                 </size>
                </property>
                <property name="maximumSize">

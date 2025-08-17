@@ -16,13 +16,22 @@
 #include <QJsonDocument>
 #include <QInputDialog>
 #include <QTextEdit>
+#include <QFormLayout>
 #include <QFileDialog>
+#include <QWebEnginePage>
+#include <QWebEngineSettings>
+#include <QUrl>
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QDesktopServices>
 
 void start_db();
 void close_db();
+QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
+                        const QString& companyName = "Atelier Princesse",
+                        const QString& companyAddress = "123 Rue Example, 31007 oran",
+                        const QString& clientName = "Client Name",
+                        const QString& clientAddress = "Client Address");
 
 stoking_p::stoking_p(QWidget *parent)
     : QMainWindow(parent)
@@ -62,6 +71,9 @@ void stoking_p::setup_cartTb(){
     ui->cartListTB->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->cartListTB->horizontalHeader()->setStretchLastSection(true);
     ui->cartListTB->verticalHeader()->setVisible(false);
+    ui->cartListTB->horizontalHeader()->setMinimumHeight(64);
+    ui->cartListTB->horizontalHeader()->setMaximumHeight(64);
+    ui->cartListTB->horizontalHeader()->setMinimumSectionSize(128);
 }
 
 void stoking_p::showContextMenuCartList(const QPoint &pos){
@@ -276,6 +288,10 @@ void stoking_p::setupHistoryTable() {
     ui->historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->historyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->historyTable->horizontalHeader()->setStretchLastSection(true);
+    ui->historyTable->verticalHeader()->setVisible(false);
+    ui->historyTable->horizontalHeader()->setMinimumHeight(64);
+    ui->historyTable->horizontalHeader()->setMaximumHeight(64);
+    ui->historyTable->horizontalHeader()->setMinimumSectionSize(128);
 }
 
 void stoking_p::setup_form(){
@@ -347,6 +363,10 @@ void stoking_p::setup_table() {
     ui->itemListTB->resizeColumnsToContents();
     ui->itemListTB->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->itemListTB->horizontalHeader()->setStretchLastSection(true);
+    ui->itemListTB->verticalHeader()->setVisible(false);
+    ui->itemListTB->horizontalHeader()->setMinimumHeight(64);
+    ui->itemListTB->horizontalHeader()->setMaximumHeight(64);
+    ui->itemListTB->horizontalHeader()->setMinimumSectionSize(128);
 
     disconnect(ui->searchItem, nullptr, nullptr, nullptr);
     connect(ui->searchItem, &QLineEdit::textChanged, this, [=](const QString &text) {
@@ -531,7 +551,8 @@ void stoking_p::setup_connects(){
         int row = index.row();
         QStandardItemModel* m = qobject_cast<QStandardItemModel*>(ui->historyTable->model());
         QString detailsJson = m->item(row, 0)->data(Qt::UserRole + 1).toString();
-        QString transactionName = m->item(row, 1)->text(); // Assuming column 1 has the transaction name
+        QString transactionName = m->item(row, 0)->text();
+        QString transactionTime = m->item(row, 1)->text();
 
         QJsonParseError error;
         QJsonDocument doc = QJsonDocument::fromJson(detailsJson.toUtf8(), &error);
@@ -573,6 +594,11 @@ void stoking_p::setup_connects(){
 
         table->setModel(detailModel);
         table->resizeColumnsToContents();
+        table->horizontalHeader()->setStretchLastSection(true);
+        table->verticalHeader()->setVisible(false);
+        table->horizontalHeader()->setMinimumHeight(64);
+        table->horizontalHeader()->setMaximumHeight(64);
+        table->horizontalHeader()->setMinimumSectionSize(128);
         layout->addWidget(table);
 
         // Add button to print invoice
@@ -580,58 +606,63 @@ void stoking_p::setup_connects(){
         layout->addWidget(printButton);
 
         // Connect button to print functionality
-        connect(printButton, &QPushButton::clicked, this, [this, items, transactionName]() {
-            QString invoiceHtml = "<h2>Invoice - " + transactionName + "</h2>";
-            invoiceHtml += "<table border='1' cellpadding='4' cellspacing='0' width='100%'>";
-            invoiceHtml += "<tr><th>Item</th><th>Quantity</th><th>Price</th><th>Total</th></tr>";
+        connect(printButton, &QPushButton::clicked, this, [this, items, transactionName, transactionTime]() {
+            QString companyName, companyAddress, clientAddress;
 
-            double grandTotal = 0.0;
+            // Show dialog to get invoice information
+            if (showInvoiceDialog(transactionName, companyName, companyAddress, clientAddress, this)) {
 
-            for (const QJsonValue& val : items) {
-                QJsonObject item = val.toObject();
-                QString name = item["name"].toString();
-                int qty = item["quantity"].toInt();
-                double price = item["price"].toDouble();
-                double total = item["subtotal"].toDouble();
-                grandTotal += total;
+                // Generate French invoice HTML
+                QString invoiceHtml = generateInvoice(items, transactionTime,
+                                                            companyName,
+                                                            companyAddress,
+                                                            transactionName, // Client name is transactionName
+                                                            clientAddress);
 
-                invoiceHtml += QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td></tr>")
-                                   .arg(name)
-                                   .arg(qty)
-                                   .arg(QString::number(price, 'f', 2))
-                                   .arg(QString::number(total, 'f', 2));
+                // Ask user where to save the PDF
+                QString filePath = QFileDialog::getSaveFileName(this, "Sauvegarder la facture PDF",
+                                                                "facture_" + transactionName + ".pdf",
+                                                                "Fichiers PDF (*.pdf)");
+                if (filePath.isEmpty()) {
+                    return; // User canceled
+                }
+
+                if (!filePath.endsWith(".pdf", Qt::CaseInsensitive)) {
+                    filePath += ".pdf";
+                }
+
+                QWebEnginePage *page = new QWebEnginePage(this);
+
+                // Set HTML and wait until it's fully loaded
+                page->setHtml(invoiceHtml, QUrl("about:blank"));
+
+                QObject::connect(page, &QWebEnginePage::loadFinished,
+                    this, [=](bool ok){
+                    if (!ok) {
+                        QMessageBox::warning(this, "Erreur", "Impossible de charger l'HTML !");
+                        return;
+                    }
+
+                    // Now print once HTML is rendered
+                    page->printToPdf(filePath, QPageLayout(QPageSize(QPageSize::A4),
+                                                            QPageLayout::Portrait,
+                                                            QMarginsF(10, 10, 10, 10)));
+
+                    QObject::connect(page, &QWebEnginePage::pdfPrintingFinished,
+                        this, [=](const QString &path, bool success){
+                        if (success) {
+                            QMessageBox::information(this, "Facture sauvegardée",
+                                               "La facture PDF a été sauvegardée:\n" + path);
+                            QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+                        } else {
+                            QMessageBox::warning(this, "Erreur", "Échec de la génération du PDF.");
+                        }
+
+                        page->deleteLater(); // cleanup
+                    });
+                });
             }
-
-            invoiceHtml += QString("<tr><td colspan='3'><b>Grand Total</b></td><td><b>%1</b></td></tr>")
-                               .arg(QString::number(grandTotal, 'f', 2));
-            invoiceHtml += "</table>";
-
-            // Ask user where to save the PDF
-            QString filePath = QFileDialog::getSaveFileName(nullptr, "Save Invoice as PDF", "", "PDF Files (*.pdf)");
-            if (filePath.isEmpty()) {
-                return; // User canceled
-            }
-
-            if (!filePath.endsWith(".pdf", Qt::CaseInsensitive)) {
-                filePath += ".pdf";
-            }
-
-            // Generate PDF using QTextDocument
-            QTextDocument doc;
-            doc.setHtml(invoiceHtml);
-
-            QPrinter printer(QPrinter::HighResolution);
-            printer.setOutputFormat(QPrinter::PdfFormat);
-            printer.setOutputFileName(filePath);
-
-            doc.print(&printer);
-
-            QMessageBox::information(nullptr, "Invoice Saved", "Invoice PDF has been saved to:\n" + filePath);
-
-            // Optional: Open the PDF after saving (platform-dependent)
-            QDesktopServices::openUrl(QUrl::fromLocalFile(filePath));
         });
-
 
         dialog->setLayout(layout);
         dialog->resize(600, 400);
@@ -902,6 +933,220 @@ void stoking_p::getFinancialSummaryAndShow(const QString& periodCondition) {
 
     // Show the popup window
     showFinancialSummaryWindow(totalRevenue, totalExpenses, netProfit);
+}
+
+
+QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
+                        const QString& companyName,
+                        const QString& companyAddress,
+                        const QString& clientName,
+                        const QString& clientAddress) {
+    QString invoiceHtml = R"(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        @media print {
+            body { margin: 0; }
+            @page {
+                size: A4;
+                margin: 0.5cm;
+            }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 10px;
+            font-size: 14px;
+            line-height: 1.2;
+        }
+        table {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div style="text-align: center; margin-bottom: 1rem; padding: 1rem; border: 2px solid #2980b9; background-color: #2980b9; color: #fff;">
+        <h2 style="font-size: 1.8rem; font-weight: bold; margin: 0; letter-spacing: 1px; color: #fff;">FACTURE</h2>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; width: 100%; margin-bottom: 1rem; font-size: 0.9rem; border: 1px solid #3498db;">
+        <div style="flex: 1 1 300px; padding: 0.8rem; min-width: 300px; box-sizing: border-box; border-right: 1px solid #3498db; background-color: #f0f8ff;">
+            <strong style="font-size: 1rem; display: block; margin-bottom: 0.4rem; color: #2980b9; text-decoration: underline;">Émetteur</strong>
+            )" + companyName + R"(<br>
+            )" + companyAddress + R"(<br>
+            SIRET: [Votre SIRET]<br>
+            Email: contact@entreprise.fr
+        </div>
+        <div style="flex: 1 1 300px; padding: 0.8rem; min-width: 300px; box-sizing: border-box; background-color: #f0f8ff;">
+            <strong style="font-size: 1rem; display: block; margin-bottom: 0.4rem; color: #2980b9; text-decoration: underline;">Destinataire</strong>
+            )" + clientName + R"(<br>
+            )" + clientAddress + R"(
+        </div>
+    </div>
+    <div style="margin-bottom: 1rem; font-size: 0.9rem; padding: 0.8rem; border: 1px solid #3498db; background-color: #e8f4f8;">
+        <strong style="font-weight: bold; color: #2c3e50;">Facture N°:</strong> )" + "1234567" + R"(<br>
+        <strong style="font-weight: bold; color: #2c3e50;">Date:</strong> )" + transactionTime + R"(
+    </div>
+    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; border: 1px solid #2980b9;">
+        <tr>
+            <th style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase;">Description</th>
+            <th style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase;">Qté</th>
+            <th style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase;">Prix Unit. HT</th>
+            <th style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase;">Total HT</th>
+        </tr>)";
+
+    double subtotalHT = 0.0;
+    bool isEvenRow = false;
+    for (const QJsonValue& val : items) {
+        QJsonObject item = val.toObject();
+        QString name = item["name"].toString();
+        int qty = item["quantity"].toInt();
+        double price = item["price"].toDouble();
+        double total = item["subtotal"].toDouble();
+        subtotalHT += total;
+
+        QString rowStyle = isEvenRow ?
+                               "padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #f8fbff;" :
+                               "padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #fff;";
+
+        QString rightAlignStyle = isEvenRow ?
+                                      "padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #f8fbff; font-weight: 500;" :
+                                      "padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #fff; font-weight: 500;";
+
+        invoiceHtml += QString(R"(
+        <tr>
+            <td style="%1">%2</td>
+            <td style="%3">%4</td>
+            <td style="%3">%5 €</td>
+            <td style="%3">%6 €</td>
+        </tr>)")
+                           .arg(rowStyle)
+                           .arg(name)
+                           .arg(rightAlignStyle)
+                           .arg(qty)
+                           .arg(QString::number(price, 'f', 2))
+                           .arg(QString::number(total, 'f', 2));
+
+        isEvenRow = !isEvenRow;
+    }
+
+    double tva = subtotalHT * 0.19;
+    double totalTTC = subtotalHT + tva;
+
+    invoiceHtml += QString(R"(
+        <tr>
+            <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">Sous-total HT</td>
+            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%1 €</td>
+        </tr>
+        <tr>
+            <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">TVA (20%%)</td>
+            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%2 €</td>
+        </tr>
+        <tr>
+            <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold;"><strong>TOTAL TTC</strong></td>
+            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold;"><strong>%3 €</strong></td>
+        </tr>
+    </table>
+    <div style="margin-top: 1rem; font-size: 0.8rem; line-height: 1.4; padding: 1rem; border: 1px solid #5dade2; background-color: #f0f8ff;">
+        <p style="margin: 0.3rem 0;"><strong style="font-weight: bold; color: #2980b9;">Conditions de paiement:</strong> Virement bancaire sous 30 jours</p>
+        <p style="margin: 0.3rem 0;"><strong style="font-weight: bold; color: #2980b9;">IBAN:</strong> FR76 XXXX XXXX XXXX XXXX XXXX XXX</p>
+        <p style="margin: 0.3rem 0;">En cas de retard, pénalités de 3x le taux légal + 40€ de frais.</p>
+    </div>
+</body>
+</html>)")
+                       .arg(QString::number(subtotalHT, 'f', 2))
+                       .arg(QString::number(tva, 'f', 2))
+                       .arg(QString::number(totalTTC, 'f', 2));
+
+    return invoiceHtml;
+}
+
+bool stoking_p::showInvoiceDialog(const QString& clientName, QString& companyName,
+                       QString& companyAddress, QString& clientAddress, QWidget* parent) {
+
+    QDialog dialog(parent);
+    dialog.setWindowTitle("Informations Facture");
+    dialog.setFixedSize(400, 300);
+
+    // Create form layout
+    QFormLayout *formLayout = new QFormLayout;
+
+    // Company name
+    QLineEdit *companyNameEdit = new QLineEdit("Ma Société SARL");
+    formLayout->addRow("Nom de la société:", companyNameEdit);
+
+    // Company address
+    QTextEdit *companyAddressEdit = new QTextEdit;
+    companyAddressEdit->setMaximumHeight(60);
+    companyAddressEdit->setPlainText("123 Rue Example\n75001 Paris\nFrance");
+    formLayout->addRow("Adresse société:", companyAddressEdit);
+
+    // Client name (read-only)
+    QLineEdit *clientNameEdit = new QLineEdit(clientName);
+    clientNameEdit->setReadOnly(true);
+    clientNameEdit->setStyleSheet("background-color: #f0f0f0;");
+    formLayout->addRow("Nom du client:", clientNameEdit);
+
+    // Client address
+    QTextEdit *clientAddressEdit = new QTextEdit;
+    clientAddressEdit->setMaximumHeight(60);
+    clientAddressEdit->setPlainText("Adresse du client\nVille, Code Postal\nPays");
+    formLayout->addRow("Adresse client:", clientAddressEdit);
+
+    // Buttons
+    QHBoxLayout *buttonLayout = new QHBoxLayout;
+    QPushButton *okButton = new QPushButton("OK");
+    QPushButton *cancelButton = new QPushButton("Annuler");
+
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(okButton);
+    buttonLayout->addWidget(cancelButton);
+
+    // Main layout
+    QVBoxLayout *mainLayout = new QVBoxLayout;
+    mainLayout->addLayout(formLayout);
+    mainLayout->addLayout(buttonLayout);
+
+    dialog.setLayout(mainLayout);
+
+    // Set focus
+    companyNameEdit->setFocus();
+    companyNameEdit->selectAll();
+
+    // Button connections
+    QObject::connect(okButton, &QPushButton::clicked, [&]() {
+        if (companyNameEdit->text().trimmed().isEmpty()) {
+            companyNameEdit->setFocus();
+            companyNameEdit->setStyleSheet("border: 2px solid red;");
+            return;
+        }
+        if (companyAddressEdit->toPlainText().trimmed().isEmpty()) {
+            companyAddressEdit->setFocus();
+            companyAddressEdit->setStyleSheet("border: 2px solid red;");
+            return;
+        }
+        if (clientAddressEdit->toPlainText().trimmed().isEmpty()) {
+            clientAddressEdit->setFocus();
+            clientAddressEdit->setStyleSheet("border: 2px solid red;");
+            return;
+        }
+        dialog.accept();
+    });
+
+    QObject::connect(cancelButton, &QPushButton::clicked, [&]() {
+        dialog.reject();
+    });
+
+    // Show dialog and get result
+    if (dialog.exec() == QDialog::Accepted) {
+        companyName = companyNameEdit->text().trimmed();
+        companyAddress = companyAddressEdit->toPlainText().trimmed();
+        clientAddress = clientAddressEdit->toPlainText().trimmed();
+        return true;
+    }
+
+    return false;
 }
 
 

@@ -64,6 +64,8 @@ private:
 //==============================================================
 
     void setup_connects();
-
+//==============================================================
+    bool showInvoiceDialog(const QString& clientName, QString& companyName,
+                           QString& companyAddress, QString& clientAddress, QWidget* parent = nullptr);
 };
 #endif // STOKING_P_H
