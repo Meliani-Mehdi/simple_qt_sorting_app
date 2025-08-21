@@ -27,7 +27,10 @@
 
 void start_db();
 void close_db();
+QString intToString(int num, int size = 8);
+int getIntSize(int num, int ren = 0);
 QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
+                        const QString& transactionNumber,
                         const QString& companyName = "Atelier Princesse",
                         const QString& companyAddress = "123 Rue Example, 31007 oran",
                         const QString& clientName = "Client Name",
@@ -46,6 +49,7 @@ stoking_p::stoking_p(QWidget *parent)
 
     ui->itemListTB->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->cartListTB->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->historyTable->setContextMenuPolicy(Qt::CustomContextMenu);
     setup_table();
     setup_form();
 
@@ -173,6 +177,7 @@ bool stoking_p::eventFilter(QObject* obj, QEvent* event) {
         double totalExpense = qty * expense;
         QString totalStr = QString::number(total, 'f', 2);
         QString totalExpenseStr = QString::number(totalExpense, 'f', 2);
+        model->setData(model->index(row, 2), qty);
         model->setData(model->index(row, 4), totalStr);
         model->setData(model->index(row, 6), totalExpenseStr);
 
@@ -257,21 +262,23 @@ void stoking_p::clear_form(){
 void stoking_p::setupHistoryTable() {
     // Create a model with custom data columns
     QStandardItemModel* model = new QStandardItemModel(ui->historyTable);
-    model->setHorizontalHeaderLabels({"Name", "Time", "Total Sold", "Total Expenss", "Net Profit"});
+    model->setHorizontalHeaderLabels({"ID", "Name", "Time", "Total Sold", "Total Expenss", "Net Profit"});
 
-    QSqlQuery query("SELECT name, total, total_expense, date, details FROM transactions ORDER BY date DESC");
+    QSqlQuery query("SELECT id, name, total, total_expense, date, details FROM transactions ORDER BY date DESC");
 
     while (query.next()) {
-        QString name = query.value(0).toString();
-        double totalSold = query.value(1).toDouble();
-        double totalExpense = query.value(2).toDouble();
-        QString date = query.value(3).toString();
-        QString detailsJson = query.value(4).toString();
+        int id = query.value(0).toInt();
+        QString name = query.value(1).toString();
+        double totalSold = query.value(2).toDouble();
+        double totalExpense = query.value(3).toDouble();
+        QString date = query.value(4).toString();
+        QString detailsJson = query.value(5).toString();
 
         double profit = totalSold - totalExpense;
 
         QList<QStandardItem*> rowItems;
-        rowItems << new QStandardItem(name)
+        rowItems << new QStandardItem(intToString(id))
+                 << new QStandardItem(name)
                  << new QStandardItem(date)
                  << new QStandardItem(QString::number(totalSold, 'f', 2))
                  << new QStandardItem(QString::number(totalExpense, 'f', 2))
@@ -496,6 +503,12 @@ void stoking_p::update_item_db(int id, QString name, QString type, float price, 
 
 //=====================================================================================================================
 
+
+void stoking_p::showContextMenuHistoryList(const QPoint &pos){
+
+}
+
+
 void stoking_p::setup_connects(){
     connect(ui->addNewItem, &QPushButton::clicked, this, [this]() {
         setup_form();
@@ -551,8 +564,9 @@ void stoking_p::setup_connects(){
         int row = index.row();
         QStandardItemModel* m = qobject_cast<QStandardItemModel*>(ui->historyTable->model());
         QString detailsJson = m->item(row, 0)->data(Qt::UserRole + 1).toString();
-        QString transactionName = m->item(row, 0)->text();
-        QString transactionTime = m->item(row, 1)->text();
+        QString transactionNumber = m->item(row, 0)->text();
+        QString transactionName = m->item(row, 1)->text();
+        QString transactionTime = m->item(row, 2)->text();
 
         QJsonParseError error;
         QJsonDocument doc = QJsonDocument::fromJson(detailsJson.toUtf8(), &error);
@@ -606,7 +620,7 @@ void stoking_p::setup_connects(){
         layout->addWidget(printButton);
 
         // Connect button to print functionality
-        connect(printButton, &QPushButton::clicked, this, [this, items, transactionName, transactionTime]() {
+        connect(printButton, &QPushButton::clicked, this, [this, items, transactionName, transactionTime, transactionNumber]() {
             QString companyName, companyAddress, clientAddress;
 
             // Show dialog to get invoice information
@@ -614,6 +628,7 @@ void stoking_p::setup_connects(){
 
                 // Generate French invoice HTML
                 QString invoiceHtml = generateInvoice(items, transactionTime,
+                                                            transactionNumber,
                                                             companyName,
                                                             companyAddress,
                                                             transactionName, // Client name is transactionName
@@ -639,7 +654,7 @@ void stoking_p::setup_connects(){
                 QObject::connect(page, &QWebEnginePage::loadFinished,
                     this, [=](bool ok){
                     if (!ok) {
-                        QMessageBox::warning(this, "Erreur", "Impossible de charger l'HTML !");
+                        QMessageBox::warning(this, "Erreur", "Impossible de charger l'PDF !");
                         return;
                     }
 
@@ -937,6 +952,7 @@ void stoking_p::getFinancialSummaryAndShow(const QString& periodCondition) {
 
 
 QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
+                        const QString& transactionNumber,
                         const QString& companyName,
                         const QString& companyAddress,
                         const QString& clientName,
@@ -985,7 +1001,7 @@ QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
         </div>
     </div>
     <div style="margin-bottom: 1rem; font-size: 0.9rem; padding: 0.8rem; border: 1px solid #3498db; background-color: #e8f4f8;">
-        <strong style="font-weight: bold; color: #2c3e50;">Facture N°:</strong> )" + "1234567" + R"(<br>
+        <strong style="font-weight: bold; color: #2c3e50;">Facture N°:</strong> )" + transactionNumber + R"(<br>
         <strong style="font-weight: bold; color: #2c3e50;">Date:</strong> )" + transactionTime + R"(
     </div>
     <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; border: 1px solid #2980b9;">
@@ -1018,8 +1034,8 @@ QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
         <tr>
             <td style="%1">%2</td>
             <td style="%3">%4</td>
-            <td style="%3">%5 €</td>
-            <td style="%3">%6 €</td>
+            <td style="%3">%5 DZD</td>
+            <td style="%3">%6 DZD</td>
         </tr>)")
                            .arg(rowStyle)
                            .arg(name)
@@ -1037,22 +1053,17 @@ QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
     invoiceHtml += QString(R"(
         <tr>
             <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">Sous-total HT</td>
-            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%1 €</td>
+            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%1 DZD</td>
         </tr>
         <tr>
-            <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">TVA (20%%)</td>
-            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%2 €</td>
+            <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">TVA (19%)</td>
+            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%2 DZD</td>
         </tr>
         <tr>
             <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold;"><strong>TOTAL TTC</strong></td>
-            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold;"><strong>%3 €</strong></td>
+            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold;"><strong>%3 DZD</strong></td>
         </tr>
     </table>
-    <div style="margin-top: 1rem; font-size: 0.8rem; line-height: 1.4; padding: 1rem; border: 1px solid #5dade2; background-color: #f0f8ff;">
-        <p style="margin: 0.3rem 0;"><strong style="font-weight: bold; color: #2980b9;">Conditions de paiement:</strong> Virement bancaire sous 30 jours</p>
-        <p style="margin: 0.3rem 0;"><strong style="font-weight: bold; color: #2980b9;">IBAN:</strong> FR76 XXXX XXXX XXXX XXXX XXXX XXX</p>
-        <p style="margin: 0.3rem 0;">En cas de retard, pénalités de 3x le taux légal + 40€ de frais.</p>
-    </div>
 </body>
 </html>)")
                        .arg(QString::number(subtotalHT, 'f', 2))
@@ -1067,19 +1078,19 @@ bool stoking_p::showInvoiceDialog(const QString& clientName, QString& companyNam
 
     QDialog dialog(parent);
     dialog.setWindowTitle("Informations Facture");
-    dialog.setFixedSize(400, 300);
+    dialog.setFixedSize(600, 400);
 
     // Create form layout
     QFormLayout *formLayout = new QFormLayout;
 
     // Company name
-    QLineEdit *companyNameEdit = new QLineEdit("Ma Société SARL");
+    QLineEdit *companyNameEdit = new QLineEdit("Ma Société");
+    companyNameEdit->setText("Atelier Princesse");
     formLayout->addRow("Nom de la société:", companyNameEdit);
 
     // Company address
     QTextEdit *companyAddressEdit = new QTextEdit;
     companyAddressEdit->setMaximumHeight(60);
-    companyAddressEdit->setPlainText("123 Rue Example\n75001 Paris\nFrance");
     formLayout->addRow("Adresse société:", companyAddressEdit);
 
     // Client name (read-only)
@@ -1091,13 +1102,12 @@ bool stoking_p::showInvoiceDialog(const QString& clientName, QString& companyNam
     // Client address
     QTextEdit *clientAddressEdit = new QTextEdit;
     clientAddressEdit->setMaximumHeight(60);
-    clientAddressEdit->setPlainText("Adresse du client\nVille, Code Postal\nPays");
     formLayout->addRow("Adresse client:", clientAddressEdit);
 
     // Buttons
     QHBoxLayout *buttonLayout = new QHBoxLayout;
     QPushButton *okButton = new QPushButton("OK");
-    QPushButton *cancelButton = new QPushButton("Annuler");
+    QPushButton *cancelButton = new QPushButton("Cancel");
 
     buttonLayout->addStretch();
     buttonLayout->addWidget(okButton);
@@ -1119,16 +1129,6 @@ bool stoking_p::showInvoiceDialog(const QString& clientName, QString& companyNam
         if (companyNameEdit->text().trimmed().isEmpty()) {
             companyNameEdit->setFocus();
             companyNameEdit->setStyleSheet("border: 2px solid red;");
-            return;
-        }
-        if (companyAddressEdit->toPlainText().trimmed().isEmpty()) {
-            companyAddressEdit->setFocus();
-            companyAddressEdit->setStyleSheet("border: 2px solid red;");
-            return;
-        }
-        if (clientAddressEdit->toPlainText().trimmed().isEmpty()) {
-            clientAddressEdit->setFocus();
-            clientAddressEdit->setStyleSheet("border: 2px solid red;");
             return;
         }
         dialog.accept();
@@ -1159,6 +1159,20 @@ void close_db() {
     }
 }
 
+QString intToString(int num, int size){
+    QString ren;
+    int number_of_zeros = size - getIntSize(num);
+    for (int var = 0; var < number_of_zeros; ++var) {
+        ren += '0';
+    }
+    ren += QString::number(num);
+    return ren;
+}
+
+int getIntSize(int num, int ren){
+    const int n = num/10;
+    return (n >= 10)? getIntSize(n, ren + 1) : ren + 1;
+}
 
 stoking_p::~stoking_p()
 {

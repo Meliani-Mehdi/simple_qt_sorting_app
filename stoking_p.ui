@@ -516,7 +516,7 @@ color: #e2e8f0;
       <item>
        <widget class="QStackedWidget" name="windowHolder">
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
         <widget class="QWidget" name="shopingWindow">
          <layout class="QHBoxLayout" name="horizontalLayout_4">
@@ -681,7 +681,7 @@ color: #e2e8f0;
              <item>
               <widget class="QLabel" name="summaryLabel">
                <property name="text">
-                <string>Order Summary</string>
+                <string>Total: 0.00</string>
                </property>
               </widget>
              </item>

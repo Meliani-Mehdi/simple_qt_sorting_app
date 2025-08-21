@@ -61,6 +61,7 @@ private:
     void setupHistoryTable();
     void getFinancialSummaryAndShow(const QString& periodCondition = "");
     void showFinancialSummaryWindow(double revenue, double expenses, double netProfit);
+    void showContextMenuHistoryList(const QPoint &pos);
 //==============================================================
 
     void setup_connects();
