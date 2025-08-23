@@ -982,14 +982,14 @@ QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
     <!-- Sender / Receiver -->
     <table width="100%" style="border:1px solid #3498db; margin-bottom:15px;">
         <tr>
-            <td style="width:50%; padding:10px; vertical-align:top; border-right:1px solid #3498db; background-color:#f0f8ff;">
+            <td width:"50%" style="padding:10px; vertical-align:top; border-right:1px solid #3498db; background-color:#f0f8ff;">
                 <strong style="font-size:16px; color:#2980b9; text-decoration:underline;">Émetteur</strong><br>
                 )" + companyName + R"(<br>
                 )" + companyAddress + R"(<br>
                 SIRET: [Votre SIRET]<br>
                 Email: contact@entreprise.fr
             </td>
-            <td style="width:50%; padding:10px; vertical-align:top; background-color:#f0f8ff;">
+            <td width:"50%" style="padding:10px; vertical-align:top; background-color:#f0f8ff;">
                 <strong style="font-size:16px; color:#2980b9; text-decoration:underline;">Destinataire</strong><br>
                 )" + clientName + R"(<br>
                 )" + clientAddress + R"(
