@@ -18,12 +18,12 @@
 #include <QTextEdit>
 #include <QFormLayout>
 #include <QFileDialog>
-#include <QWebEnginePage>
-#include <QWebEngineSettings>
 #include <QUrl>
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QDesktopServices>
+#include <QTextDocument>
+
 
 void start_db();
 void close_db();
@@ -623,59 +623,61 @@ void stoking_p::setup_connects(){
         connect(printButton, &QPushButton::clicked, this, [this, items, transactionName, transactionTime, transactionNumber]() {
             QString companyName, companyAddress, clientAddress;
 
-            // Show dialog to get invoice information
             if (showInvoiceDialog(transactionName, companyName, companyAddress, clientAddress, this)) {
-
-                // Generate French invoice HTML
                 QString invoiceHtml = generateInvoice(items, transactionTime,
-                                                            transactionNumber,
-                                                            companyName,
-                                                            companyAddress,
-                                                            transactionName, // Client name is transactionName
-                                                            clientAddress);
+                                                      transactionNumber,
+                                                      companyName,
+                                                      companyAddress,
+                                                      transactionName,
+                                                      clientAddress);
 
                 // Ask user where to save the PDF
-                QString filePath = QFileDialog::getSaveFileName(this, "Sauvegarder la facture PDF",
-                                                                "facture_" + transactionName + ".pdf",
-                                                                "Fichiers PDF (*.pdf)");
-                if (filePath.isEmpty()) {
-                    return; // User canceled
-                }
+                QString filePath = QFileDialog::getSaveFileName(
+                    this,
+                    "Sauvegarder la facture PDF",
+                    "facture_" + transactionName + ".pdf",
+                    "Fichiers PDF (*.pdf)"
+                    );
+                if (filePath.isEmpty())
+                    return;
 
-                if (!filePath.endsWith(".pdf", Qt::CaseInsensitive)) {
+                if (!filePath.endsWith(".pdf", Qt::CaseInsensitive))
                     filePath += ".pdf";
-                }
 
-                QWebEnginePage *page = new QWebEnginePage(this);
 
-                // Set HTML and wait until it's fully loaded
-                page->setHtml(invoiceHtml, QUrl("about:blank"));
+                QPrinter printer(QPrinter::HighResolution);
+                printer.setOutputFormat(QPrinter::PdfFormat);
+                printer.setResolution(300);
+                printer.setOutputFileName(filePath);
 
-                QObject::connect(page, &QWebEnginePage::loadFinished,
-                    this, [=](bool ok){
-                    if (!ok) {
-                        QMessageBox::warning(this, "Erreur", "Impossible de charger l'PDF !");
-                        return;
-                    }
+                QPageLayout layout(QPageSize(QPageSize::A4),
+                                   QPageLayout::Portrait,
+                                   QMarginsF(10, 10, 10, 10));
+                printer.setPageLayout(layout);
 
-                    // Now print once HTML is rendered
-                    page->printToPdf(filePath, QPageLayout(QPageSize(QPageSize::A4),
-                                                            QPageLayout::Portrait,
-                                                            QMarginsF(10, 10, 10, 10)));
+                QTextDocument doc;
+                doc.setDefaultStyleSheet(
+                    "table{width:100%;border-collapse:collapse;}"
+                    );
 
-                    QObject::connect(page, &QWebEnginePage::pdfPrintingFinished,
-                        this, [=](const QString &path, bool success){
-                        if (success) {
-                            QMessageBox::information(this, "Facture sauvegardée",
-                                               "La facture PDF a été sauvegardée:\n" + path);
-                            QDesktopServices::openUrl(QUrl::fromLocalFile(path));
-                        } else {
-                            QMessageBox::warning(this, "Erreur", "Échec de la génération du PDF.");
-                        }
+                // Feed HTML
+                doc.setHtml(invoiceHtml);
 
-                        page->deleteLater(); // cleanup
-                    });
-                });
+                // Force width in points (A4 = 595 x 842 points @ 72dpi)
+                doc.setPageSize(QSizeF(595, 842));  // width x height in points
+
+                // Add a little padding inside
+                doc.setDocumentMargin(20.0);
+
+                // Print to PDF
+                doc.print(&printer);
+
+
+                QMessageBox::information(this, "Facture sauvegardée",
+                                         "La facture PDF a été sauvegardée:\n" + filePath);
+                QDesktopServices::openUrl(QUrl::fromLocalFile(filePath));
+
+
             }
         });
 
@@ -962,54 +964,52 @@ QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        @media print {
-            body { margin: 0; }
-            @page {
-                size: A4;
-                margin: 0.5cm;
-            }
-        }
         body {
             font-family: Arial, sans-serif;
             margin: 10px;
             font-size: 14px;
             line-height: 1.2;
         }
-        table {
-            width: 100%;
-        }
     </style>
 </head>
 <body>
-    <div style="text-align: center; margin-bottom: 1rem; padding: 1rem; border: 2px solid #2980b9; background-color: #2980b9; color: #fff;">
-        <h2 style="font-size: 1.8rem; font-weight: bold; margin: 0; letter-spacing: 1px; color: #fff;">FACTURE</h2>
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 15px; padding: 10px; border: 2px solid #2980b9; background-color: #2980b9; color: #ffffff;">
+        <h2 style="font-size: 22px; font-weight: bold; margin: 0; letter-spacing: 1px; color: #ffffff;">FACTURE</h2>
     </div>
-    <div style="display: flex; flex-wrap: wrap; width: 100%; margin-bottom: 1rem; font-size: 0.9rem; border: 1px solid #3498db;">
-        <div style="flex: 1 1 300px; padding: 0.8rem; min-width: 300px; box-sizing: border-box; border-right: 1px solid #3498db; background-color: #f0f8ff;">
-            <strong style="font-size: 1rem; display: block; margin-bottom: 0.4rem; color: #2980b9; text-decoration: underline;">Émetteur</strong>
-            )" + companyName + R"(<br>
-            )" + companyAddress + R"(<br>
-            SIRET: [Votre SIRET]<br>
-            Email: contact@entreprise.fr
-        </div>
-        <div style="flex: 1 1 300px; padding: 0.8rem; min-width: 300px; box-sizing: border-box; background-color: #f0f8ff;">
-            <strong style="font-size: 1rem; display: block; margin-bottom: 0.4rem; color: #2980b9; text-decoration: underline;">Destinataire</strong>
-            )" + clientName + R"(<br>
-            )" + clientAddress + R"(
-        </div>
-    </div>
-    <div style="margin-bottom: 1rem; font-size: 0.9rem; padding: 0.8rem; border: 1px solid #3498db; background-color: #e8f4f8;">
+
+    <!-- Sender / Receiver -->
+    <table width="100%" style="border:1px solid #3498db; margin-bottom:15px;">
+        <tr>
+            <td style="width:50%; padding:10px; vertical-align:top; border-right:1px solid #3498db; background-color:#f0f8ff;">
+                <strong style="font-size:16px; color:#2980b9; text-decoration:underline;">Émetteur</strong><br>
+                )" + companyName + R"(<br>
+                )" + companyAddress + R"(<br>
+                SIRET: [Votre SIRET]<br>
+                Email: contact@entreprise.fr
+            </td>
+            <td style="width:50%; padding:10px; vertical-align:top; background-color:#f0f8ff;">
+                <strong style="font-size:16px; color:#2980b9; text-decoration:underline;">Destinataire</strong><br>
+                )" + clientName + R"(<br>
+                )" + clientAddress + R"(
+            </td>
+        </tr>
+    </table>
+
+    <!-- Invoice Info -->
+    <div style="margin-bottom: 15px; font-size: 14px; padding: 8px; border: 1px solid #3498db; background-color: #e8f4f8;">
         <strong style="font-weight: bold; color: #2c3e50;">Facture N°:</strong> )" + transactionNumber + R"(<br>
         <strong style="font-weight: bold; color: #2c3e50;">Date:</strong> )" + transactionTime + R"(
     </div>
-    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; border: 1px solid #2980b9;">
+
+    <!-- Items Table -->
+    <table width="100%" style="border-collapse: collapse; margin: 10px 0; font-size: 14px; border: 1px solid #2980b9;">
         <tr>
-            <th style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase;">Description</th>
-            <th style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase;">Qté</th>
-            <th style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase;">Prix Unit. HT</th>
-            <th style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase;">Total HT</th>
+            <th style="padding: 6px; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #ffffff; font-weight: bold;">Description</th>
+            <th style="padding: 6px; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #ffffff; font-weight: bold;">Qté</th>
+            <th style="padding: 6px; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #ffffff; font-weight: bold;">Prix Unit. HT</th>
+            <th style="padding: 6px; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #ffffff; font-weight: bold;">Total HT</th>
         </tr>)";
 
     double subtotalHT = 0.0;
@@ -1023,12 +1023,12 @@ QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
         subtotalHT += total;
 
         QString rowStyle = isEvenRow ?
-                               "padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #f8fbff;" :
+                               "padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #e8ebff;" :
                                "padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #fff;";
 
         QString rightAlignStyle = isEvenRow ?
-                                      "padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #f8fbff; font-weight: 500;" :
-                                      "padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #fff; font-weight: 500;";
+                                      "padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #e8ebff; font-weight: 300;" :
+                                      "padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #fff; font-weight: 300;";
 
         invoiceHtml += QString(R"(
         <tr>
@@ -1052,16 +1052,16 @@ QString generateInvoice(const QJsonArray& items, const QString& transactionTime,
 
     invoiceHtml += QString(R"(
         <tr>
-            <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">Sous-total HT</td>
-            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%1 DZD</td>
+            <td colspan="3" style="padding: 6px; text-align: left; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">Sous-total HT</td>
+            <td style="padding: 6px; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%1 DZD</td>
         </tr>
         <tr>
-            <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">TVA (19%)</td>
-            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%2 DZD</td>
+            <td colspan="3" style="padding: 6px; text-align: left; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">TVA (19%)</td>
+            <td style="padding: 6px; text-align: right; border: 1px solid #2980b9; background-color: #e3f2fd; font-weight: bold;">%2 DZD</td>
         </tr>
         <tr>
-            <td colspan="3" style="padding: 0.6rem 0.5rem; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold;"><strong>TOTAL TTC</strong></td>
-            <td style="padding: 0.6rem 0.5rem; text-align: right; border: 1px solid #2980b9; background-color: #2980b9; color: #fff; font-weight: bold;"><strong>%3 DZD</strong></td>
+            <td colspan="3" style="padding: 6px; text-align: left; border: 1px solid #2980b9; background-color: #2980b9; color: #ffffff; font-weight: bold;">TOTAL TTC</td>
+            <td style="padding: 6px; text-align: right; border: 1px solid #2980b9; background-color: #2980b9; color: #ffffff; font-weight: bold;">%3 DZD</td>
         </tr>
     </table>
 </body>
